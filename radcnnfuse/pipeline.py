@@ -1,8 +1,11 @@
 import os
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
-from pathlib import Path
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 
 from .radiomics_engine import (
     create_radiomics_extractor,
@@ -20,97 +23,113 @@ class RadCNNFuse:
     def __init__(
         self,
         image_size=(224, 224),
-        use_radiomics=True,
-        use_cnn=True
+        pca_components=100
     ):
+        """
+        RadCNNFuse complete feature-engineering pipeline.
+
+        Parameters
+        ----------
+        image_size : tuple
+            Image size used for radiomics and CNN processing.
+
+        pca_components : int
+            Number of PCA components.
+        """
 
         self.image_size = image_size
+        self.pca_components = pca_components
 
-        self.use_radiomics = use_radiomics
-        self.use_cnn = use_cnn
+        # --------------------------------------------------
+        # Create engines
+        # --------------------------------------------------
 
-        # Create engines once
-        if self.use_radiomics:
-            self.radiomics_extractor = (
-                create_radiomics_extractor()
+        print("Initializing RadCNNFuse...")
+
+        self.radiomics_extractor = (
+            create_radiomics_extractor()
+        )
+
+        self.cnn_feature_model = (
+            create_cnn_feature_model(
+                image_size=image_size
             )
-        else:
-            self.radiomics_extractor = None
+        )
 
-        if self.use_cnn:
-            self.cnn_model = (
-                create_cnn_feature_model(
-                    image_size=self.image_size
-                )
-            )
-        else:
-            self.cnn_model = None
+        # --------------------------------------------------
+        # Scaler and PCA
+        # --------------------------------------------------
 
-    # --------------------------------------------------------
-    # Extract features from one image
-    # --------------------------------------------------------
+        self.scaler = StandardScaler()
+
+        self.pca = PCA(
+            n_components=pca_components,
+            random_state=42
+        )
+
+        print("Radiomics engine: READY")
+        print("CNN engine: READY")
+        print("Scaler: READY")
+        print("PCA: READY")
+
+    # ======================================================
+    # Single image
+    # ======================================================
 
     def extract_features(
         self,
-        image_path
+        image_path,
+        mask_path=None
     ):
+        """
+        Extract radiomics + CNN features from one image.
+        """
 
-        all_features = []
-
-        radiomics_features = None
-        cnn_features = None
-        mask_source = None
-
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # Radiomics
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
-        if self.use_radiomics:
-
-            radiomics_features, mask_source = (
-                extract_radiomics_features(
-                    image_path=image_path,
-                    extractor=self.radiomics_extractor,
-                    image_size=self.image_size
-                )
+        radiomics_features, mask_source = (
+            extract_radiomics_features(
+                image_path=image_path,
+                mask_path=mask_path,
+                extractor=self.radiomics_extractor,
+                image_size=self.image_size
             )
+        )
 
-            all_features.append(
-                radiomics_features
-            )
-
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # CNN
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
-        if self.use_cnn:
+        cnn_features = extract_cnn_features(
+            image_path=image_path,
+            model=self.cnn_feature_model,
+            image_size=self.image_size
+        )
 
-            cnn_features = (
-                extract_cnn_features(
-                    image_path=image_path,
-                    model=self.cnn_model,
-                    image_size=self.image_size
-                )
-            )
-
-            all_features.append(
-                cnn_features
-            )
-
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # Fusion
-        # ----------------------------------------------------
-
-        if not all_features:
-
-            raise ValueError(
-                "At least one feature extractor "
-                "must be enabled."
-            )
+        # --------------------------------------------------
 
         fused_features = np.concatenate(
-            all_features
+            [
+                radiomics_features,
+                cnn_features
+            ]
         )
+
+        # --------------------------------------------------
+        # Validation
+        # --------------------------------------------------
+
+        if not np.isfinite(
+            fused_features
+        ).all():
+
+            raise ValueError(
+                "NaN or Inf detected in extracted features."
+            )
 
         return {
             "radiomics": radiomics_features,
@@ -119,16 +138,17 @@ class RadCNNFuse:
             "mask_source": mask_source
         }
 
-    # --------------------------------------------------------
-    # Transform dataset
-    # --------------------------------------------------------
+    # ======================================================
+    # Dataset image discovery
+    # ======================================================
 
-    def transform_dataset(
+    def _find_images(
         self,
-        image_folder,
-        labels=None,
-        output_csv=None
+        image_folder
     ):
+        """
+        Find supported medical images recursively.
+        """
 
         image_folder = Path(
             image_folder
@@ -137,55 +157,98 @@ class RadCNNFuse:
         if not image_folder.exists():
 
             raise FileNotFoundError(
-                f"Image folder not found: "
-                f"{image_folder}"
+                f"Image folder not found: {image_folder}"
             )
 
-        # ----------------------------------------------------
-        # Find images
-        # ----------------------------------------------------
-
-        extensions = [
-            "*.png",
-            "*.jpg",
-            "*.jpeg",
-            "*.bmp",
-            "*.tif",
-            "*.tiff"
-        ]
+        extensions = {
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".bmp",
+            ".tif",
+            ".tiff"
+        }
 
         image_paths = []
 
-        for extension in extensions:
+        for path in image_folder.rglob("*"):
 
-            image_paths.extend(
-                image_folder.rglob(
-                    extension
+            if (
+                path.is_file()
+                and
+                path.suffix.lower()
+                in extensions
+            ):
+
+                image_paths.append(
+                    str(path)
                 )
-            )
 
-        image_paths = sorted(
-            image_paths
-        )
+        image_paths.sort()
 
         if len(image_paths) == 0:
 
             raise ValueError(
-                "No medical images found "
-                f"in {image_folder}"
+                f"No supported images found in: "
+                f"{image_folder}"
             )
 
-        print(
-            f"Found {len(image_paths)} images."
+        return image_paths
+
+    # ======================================================
+    # Full dataset transformation
+    # ======================================================
+
+    def transform_dataset(
+        self,
+        image_folder,
+        labels=None,
+        output_csv=None
+    ):
+        """
+        Complete RadCNNFuse pipeline.
+
+        Parameters
+        ----------
+        image_folder : str
+            Folder containing medical images.
+
+        labels : list, optional
+            Optional labels corresponding to images.
+
+        output_csv : str, optional
+            Path where PCA feature dataset will be saved.
+
+        Returns
+        -------
+        pandas.DataFrame
+            PCA feature dataset.
+        """
+
+        # --------------------------------------------------
+        # Find images
+        # --------------------------------------------------
+
+        image_paths = self._find_images(
+            image_folder
         )
 
-        # ----------------------------------------------------
-        # Process images
-        # ----------------------------------------------------
+        print(
+            f"\nFound {len(image_paths)} images."
+        )
+
+        print(
+            "\nStarting RadCNNFuse extraction..."
+        )
+
+        # --------------------------------------------------
+        # Extract features
+        # --------------------------------------------------
 
         feature_rows = []
 
         successful_paths = []
+
         failed_paths = []
 
         for index, image_path in enumerate(
@@ -196,38 +259,47 @@ class RadCNNFuse:
             try:
 
                 result = self.extract_features(
-                    str(image_path)
+                    image_path
                 )
 
+                fused = result["fused"]
+
                 feature_rows.append(
-                    result["fused"]
+                    fused
                 )
 
                 successful_paths.append(
-                    str(image_path)
+                    image_path
                 )
 
                 print(
                     f"[{index}/{len(image_paths)}] "
-                    f"{image_path.name} ✓"
+                    f"SUCCESS: "
+                    f"{Path(image_path).name}"
                 )
 
             except Exception as e:
 
-                failed_paths.append({
-                    "path": str(image_path),
-                    "error": str(e)
-                })
+                failed_paths.append(
+                    {
+                        "path": image_path,
+                        "error": str(e)
+                    }
+                )
 
                 print(
                     f"[{index}/{len(image_paths)}] "
-                    f"{image_path.name} ✗ "
-                    f"{e}"
+                    f"FAILED: "
+                    f"{Path(image_path).name}"
                 )
 
-        # ----------------------------------------------------
-        # Check successful extraction
-        # ----------------------------------------------------
+                print(
+                    f"    Error: {e}"
+                )
+
+        # --------------------------------------------------
+        # Check extraction
+        # --------------------------------------------------
 
         if len(feature_rows) == 0:
 
@@ -235,50 +307,78 @@ class RadCNNFuse:
                 "No images were successfully processed."
             )
 
-        # ----------------------------------------------------
-        # Create feature matrix
-        # ----------------------------------------------------
-
         X = np.asarray(
             feature_rows,
             dtype=np.float32
         )
 
         print(
-            "\nFeature matrix shape:",
+            "\nRaw fused feature matrix:",
             X.shape
         )
 
-        # ----------------------------------------------------
-        # Create column names
-        # ----------------------------------------------------
+        # --------------------------------------------------
+        # Scaling
+        # --------------------------------------------------
 
-        feature_columns = [
-            f"Feature_{i+1}"
+        print(
+            "\nApplying StandardScaler..."
+        )
+
+        X_scaled = self.scaler.fit_transform(
+            X
+        )
+
+        # --------------------------------------------------
+        # PCA
+        # --------------------------------------------------
+
+        print(
+            "Applying PCA..."
+        )
+
+        # Make sure PCA components are valid
+        n_components = min(
+            self.pca_components,
+            X_scaled.shape[0],
+            X_scaled.shape[1]
+        )
+
+        if n_components != self.pca_components:
+
+            self.pca = PCA(
+                n_components=n_components,
+                random_state=42
+            )
+
+        X_pca = self.pca.fit_transform(
+            X_scaled
+        )
+
+        # --------------------------------------------------
+        # Create DataFrame
+        # --------------------------------------------------
+
+        pca_columns = [
+            f"PCA_{i+1}"
             for i in range(
-                X.shape[1]
+                X_pca.shape[1]
             )
         ]
 
         df = pd.DataFrame(
-            X,
-            columns=feature_columns
+            X_pca,
+            columns=pca_columns
         )
 
-        # ----------------------------------------------------
-        # Add image paths
-        # ----------------------------------------------------
-
+        # Image paths
         df.insert(
             0,
             "Image_Path",
             successful_paths
         )
 
-        # ----------------------------------------------------
-        # Add labels if provided
-        # ----------------------------------------------------
-
+        # Optional labels
         if labels is not None:
 
             if len(labels) != len(image_paths):
@@ -288,33 +388,35 @@ class RadCNNFuse:
                     "number of images."
                 )
 
-            # Only successful images
+            # Keep labels corresponding to successful images
             successful_labels = []
-
-            path_to_label = {
-                str(path): label
-                for path, label
-                in zip(
-                    image_paths,
-                    labels
-                )
-            }
 
             for path in successful_paths:
 
-                successful_labels.append(
-                    path_to_label[path]
+                original_index = (
+                    image_paths.index(path)
                 )
 
-            df["Label"] = (
-                successful_labels
-            )
+                successful_labels.append(
+                    labels[original_index]
+                )
 
-        # ----------------------------------------------------
+            df["Label"] = successful_labels
+
+        # --------------------------------------------------
         # Save CSV
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
         if output_csv is not None:
+
+            output_csv = Path(
+                output_csv
+            )
+
+            output_csv.parent.mkdir(
+                parents=True,
+                exist_ok=True
+            )
 
             df.to_csv(
                 output_csv,
@@ -322,33 +424,33 @@ class RadCNNFuse:
             )
 
             print(
-                f"\nSaved dataset: "
-                f"{output_csv}"
+                f"\nSaved feature dataset to:"
+                f"\n{output_csv}"
             )
 
-        # ----------------------------------------------------
+        # --------------------------------------------------
         # Summary
-        # ----------------------------------------------------
+        # --------------------------------------------------
 
         print(
-            "\n======================================"
+            "\n=============================================="
         )
 
         print(
-            "       RadCNNFuse Summary"
+            "       RadCNNFuse EXTRACTION COMPLETE"
         )
 
         print(
-            "======================================"
+            "=============================================="
         )
 
         print(
-            "Total images:",
+            "Total images found:",
             len(image_paths)
         )
 
         print(
-            "Successful:",
+            "Successfully processed:",
             len(successful_paths)
         )
 
@@ -358,28 +460,22 @@ class RadCNNFuse:
         )
 
         print(
-            "Feature dimension:",
+            "Raw fused features:",
             X.shape[1]
         )
 
         print(
-            "Dataset shape:",
+            "PCA components:",
+            X_pca.shape[1]
+        )
+
+        print(
+            "Final dataset shape:",
             df.shape
         )
 
-        if failed_paths:
-
-            print(
-                "\nFailed images:"
-            )
-
-            for item in failed_paths:
-
-                print(
-                    item["path"],
-                    "->",
-                    item["error"]
-                )
+        print(
+            "=============================================="
+        )
 
         return df
-```
