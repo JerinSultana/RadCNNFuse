@@ -2,189 +2,149 @@
 
 **Radiomics + CNN Feature Fusion Framework for Medical Image Analysis**
 
-RadCNNFuse is a research-oriented Python framework designed to simplify hybrid feature engineering from medical images by combining handcrafted **radiomics features** with deep **CNN features**, followed by feature fusion, scaling, and PCA-based dimensionality reduction.
+RadCNNFuse is a lightweight, research-oriented Python framework for **hybrid feature engineering from medical images**.
 
-The framework was motivated by a practical problem encountered during undergraduate medical-image research: manually reproducing radiomics extraction and hybrid feature-engineering pipelines can be time-consuming, repetitive, and difficult to maintain.
-
-RadCNNFuse aims to turn this repetitive workflow into a **reusable, lightweight, and classifier-independent feature-engineering pipeline**.
+It combines **handcrafted radiomics features** and **deep CNN features**, fuses them, applies feature scaling and PCA, and produces a compact feature dataset that can be used with the researcher's preferred machine-learning classifier.
 
 ---
 
 ## Why RadCNNFuse?
 
-Hybrid medical-image analysis commonly involves several separate stages:
+During my undergraduate medical-image research, I found that extracting radiomics features and combining them with CNN features required **a lot of repetitive code, preprocessing steps, and time**.
 
-1. Image preprocessing
-2. ROI/mask generation
-3. Radiomics feature extraction
-4. Deep CNN feature extraction
-5. Feature fusion
-6. Feature scaling
-7. Dimensionality reduction
-8. Downstream classification
+RadCNNFuse was developed to make this workflow **simpler, reusable, and faster to reproduce**.
 
-Rebuilding these steps manually can require substantial code and repeated experimentation.
-
-RadCNNFuse provides a unified feature-engineering layer so researchers can focus more on their experiments and less on repeatedly implementing the same extraction workflow.
-
-### The main idea
+### The idea
 
 ```text
 Medical Image
       ↓
    RadCNNFuse
       ↓
+Radiomics + CNN Features
+      ↓
+     Fusion
+      ↓
+   Scaling + PCA
+      ↓
 PCA Feature Dataset
       ↓
 Researcher's Classifier
 ```
 
-RadCNNFuse handles the feature-engineering stage, while the researcher remains free to select the downstream machine-learning classifier.
-
 ---
-## RadCNNFuse Core Pipeline
 
-The proposed **RadCNNFuse** framework integrates handcrafted radiomics features with deep CNN features, followed by feature fusion, standard scaling, and PCA-based dimensionality reduction to generate a compact feature representation for downstream machine-learning experiments.
+## Core Pipeline
 
 <p align="center">
   <img src="Core%20Pipeline.png" width="850" alt="RadCNNFuse Core Pipeline">
 </p>
 
-**Figure 1.** Overall architecture of the RadCNNFuse framework, including radiomics and CNN feature extraction, feature fusion, scaling, PCA-based dimensionality reduction, and downstream classifier selection.
+**Figure 1.** RadCNNFuse feature-engineering pipeline.
 
 ---
-
-## Core Pipeline
-
-RadCNNFuse combines two complementary feature representations:
-
-* **Handcrafted radiomics features**, which describe image intensity, texture, and spatial characteristics.
-* **Deep CNN features**, which provide learned visual representations from a convolutional neural network.
-
-These representations are concatenated into a hybrid feature vector and subsequently transformed using scaling and PCA.
-
 
 ## Key Features
 
-* Automatic radiomics feature extraction
-* CNN-based deep feature extraction
+* Radiomics feature extraction
+* CNN-based feature extraction
 * Radiomics + CNN feature fusion
-* Automatic ROI/mask generation
-* External mask support
-* Standard feature scaling
-* PCA-based dimensionality reduction
+* Automatic ROI/mask support
+* Feature scaling
+* PCA dimensionality reduction
 * Batch feature extraction
-* Checkpoint-supported processing
 * CSV feature-dataset generation
-* Reusable Python package interface
-* Classifier-independent feature representation
-* End-to-end feature extraction and transformation
-* Designed for research and experimentation
+* Reusable Python package
+* Classifier-independent design
 
 ---
 
-## 📊 Current Experimental Configuration
+## Why Is It Useful for Medical-Image Researchers?
 
-The current implementation was developed and validated using kidney CT images.
+RadCNNFuse is designed to solve a common practical problem in medical-image research: **feature extraction can become repetitive and time-consuming when every experiment requires rebuilding the same pipeline.**
 
-| Component                | Current Configuration |
-| ------------------------ | --------------------- |
-| Dataset                  | Kidney CT images      |
-| Dataset size             | 745 images            |
-| Classes                  | Cyst, Normal, Stone   |
-| Radiomics representation | 567 features/image    |
-| CNN backbone             | MobileNetV2           |
-| CNN representation       | 1,280 features/image  |
-| Fused representation     | 1,847 features/image  |
-| PCA representation       | 100 features/image    |
-| PCA variance retained*   | 92.39%                |
+With RadCNNFuse, researchers can use the same feature-engineering workflow and focus on the **actual research question and classifier experimentation**.
 
-*The reported 92.39% variance retention refers to the PCA representation generated for the full feature dataset for feature export.
+### Researchers can benefit by:
 
-For unbiased machine-learning evaluation, **scaling and PCA should be fitted only on the training data and then applied to the held-out test data**. This protocol was followed in the reported test-set evaluation.
+**1. Saving development time**
 
-### Important
+Instead of repeatedly implementing radiomics extraction, CNN feature extraction, feature fusion, scaling, and PCA, researchers can use a unified pipeline.
 
-The feature dimensions above are **configuration-dependent**.
+**2. Reducing repetitive code**
 
-They are determined by:
+The framework provides a reusable feature-engineering layer instead of requiring the complete workflow to be rewritten for every project.
 
-* selected radiomics feature classes and settings,
-* enabled image types,
-* CNN backbone and feature-extraction layer,
-* feature-fusion strategy,
-* PCA configuration.
+**3. Separating feature engineering from classification**
 
-Therefore, the dimensions are not dependent on the number of images.
-
-For example:
+Researchers can generate a PCA feature dataset once and experiment with different classifiers independently.
 
 ```text
-1 image
-→ 567 radiomics features
-→ 1,280 CNN features
-→ 1,847 fused features
-→ 100 PCA features
+RadCNNFuse
+     ↓
+PCA Features
+     ↓
+ ┌───────────┬───────────┬───────────┐
+ │    SVM    │ Random    │    MLP    │
+ │           │  Forest   │           │
+ └───────────┴───────────┴───────────┘
 ```
 
-For `N` images:
+**4. Making experiments easier to reproduce**
 
-```text
-N × 1,847 fused feature matrix
-```
+The same feature-extraction workflow can be reused across different experiments and datasets.
 
-and after PCA:
+**5. Supporting hybrid medical-image research**
 
-```text
-N × 100 PCA feature matrix
-```
+Researchers can combine handcrafted radiomics information with learned CNN representations without manually rebuilding the entire feature-fusion pipeline.
 
 ---
 
-## ⚡ Processing Efficiency
+## Current Experimental Configuration
 
-RadCNNFuse is designed to reduce repetitive implementation and feature-engineering overhead.
+The current implementation was developed using kidney CT images.
 
-In the current experimental environment, the complete batch feature-extraction process was tested on **745 kidney CT images**.
+| Component      | Configuration       |
+| -------------- | ------------------- |
+| Dataset        | Kidney CT images    |
+| Images         | 745                 |
+| Classes        | Cyst, Normal, Stone |
+| Radiomics      | 567 features/image  |
+| CNN            | MobileNetV2         |
+| CNN features   | 1,280/image         |
+| Fused features | 1,847/image         |
+| PCA            | 100 components      |
+
+**Note:** Feature dimensions depend on the selected radiomics settings, CNN backbone, feature-extraction layer, fusion strategy, and PCA configuration. They are not determined by the number of images.
+
+---
+
+## Processing Efficiency
+
+In the current experimental environment:
 
 ```text
-Total images              : 745
-Successfully processed    : 745
-Failed                    : 0
-Total extraction time     : ~4.05 minutes
-Average time/image        : ~0.33 seconds
+745 images
+↓
+~4.05 minutes
+↓
+~0.33 seconds/image
 ```
 
-The pipeline generated:
-
-```text
-567 radiomics features/image
-+
-1,280 CNN features/image
-=
-1,847 fused features/image
-```
-
-The reported processing time is specific to the tested hardware, preprocessing configuration, radiomics settings, CNN backbone, and implementation environment. It should therefore not be interpreted as a universal benchmark.
+This timing is hardware- and configuration-dependent and should not be considered a universal benchmark.
 
 ---
 
 ## Installation
 
-Clone the repository:
-
 ```bash
 git clone https://github.com/JerinSultana/RadCNNFuse.git
 cd RadCNNFuse
-```
 
-Install the package:
-
-```bash
 pip install -e .
 ```
 
-Install dependencies if required:
+If required:
 
 ```bash
 pip install -r requirements.txt
@@ -192,89 +152,37 @@ pip install -r requirements.txt
 
 ---
 
-## Package Interface
-
-The intended package interface is:
+## Basic Usage
 
 ```python
 from radcnnfuse import RadCNNFuse
 
 rf = RadCNNFuse()
-```
 
-After initialization, the framework can be used to transform medical images into reduced feature representations.
-
-Example:
-
-```python
 features = rf.transform(
     "path/to/medical_image.jpg"
 )
 ```
 
-The exact available methods and configuration options may depend on the installed version of RadCNNFuse.
-
----
-
-## Feature Extraction
-
-RadCNNFuse independently extracts radiomics and CNN representations.
-
-Conceptually:
-
-```python
-radiomics_features = ...
-cnn_features = ...
-
-fused_features = concatenate(
-    [radiomics_features, cnn_features]
-)
-```
-
-In the current experimental configuration:
-
-```text
-Radiomics → 567 features
-CNN      → 1,280 features
-Fusion   → 1,847 features
-```
-
----
-
-## PCA-Based Dimensionality Reduction
-
-After feature fusion, RadCNNFuse applies standard scaling followed by PCA.
-
-Current experimental configuration:
-
-```text
-Input features     : 1,847
-PCA components     : 100
-```
-
-The resulting representation is:
-
-```text
-1,847-dimensional
-        ↓
-      PCA
-        ↓
-100-dimensional
-```
-
-This substantially reduces the dimensionality of the hybrid feature representation while retaining a large proportion of the variance under the tested configuration.
+The resulting representation can be used for downstream machine-learning experiments.
 
 ---
 
 ## Classifier-Independent Design
 
-One of the main design goals of RadCNNFuse is to keep **feature extraction separate from downstream classification**.
+RadCNNFuse does **not** force researchers to use a particular classifier.
 
-RadCNNFuse does not require researchers to use a specific classifier.
+After generating the PCA feature dataset, researchers can use algorithms such as:
 
-After obtaining the PCA feature dataset, researchers can train different machine-learning models according to their experimental requirements.
+* SVM
+* Random Forest
+* Logistic Regression
+* XGBoost
+* LightGBM
+* CatBoost
+* MLP
 
-### Example: SVM
+Example:
 
 ```python
 from sklearn.svm import SVC
@@ -284,205 +192,111 @@ classifier = SVC(
     random_state=42
 )
 
-classifier.fit(
-    X_train,
-    y_train
-)
+classifier.fit(X_train, y_train)
 ```
 
-### Example: Random Forest
-
-```python
-from sklearn.ensemble import RandomForestClassifier
-
-classifier = RandomForestClassifier(
-    n_estimators=100,
-    random_state=42
-)
-
-classifier.fit(
-    X_train,
-    y_train
-)
-```
-
-Other compatible classifiers can also be investigated, including:
-
-* Logistic Regression
-* XGBoost
-* LightGBM
-* CatBoost
-* Random Forest
-* SVM
-* MLP
-* Other machine-learning classifiers
-
-This allows researchers to experiment with different downstream models **without rebuilding the radiomics + CNN feature-extraction pipeline**.
+This allows researchers to change the classifier **without rebuilding the feature-extraction pipeline**.
 
 ---
 
-## PCA Dataset Output
+## PCA Feature Dataset
 
-RadCNNFuse can generate a PCA-reduced CSV feature dataset.
-
-A typical output contains:
-
-```text
-Image_Path
-PCA_1
-PCA_2
-PCA_3
-...
-PCA_100
-Label
-```
-
-For the current experimental dataset:
-
-```text
-Samples       : 745
-PCA features  : 100
-```
-
-Therefore, the feature matrix is:
-
-```text
-745 × 100
-```
-
-plus the image-path and label columns.
-
-Example:
+RadCNNFuse can generate a CSV dataset such as:
 
 ```text
 Image_Path | PCA_1 | PCA_2 | ... | PCA_100 | Label
 ```
 
-The generated dataset can then be loaded into a separate machine-learning workflow.
+For example:
+
+```text
+745 images
+×
+100 PCA features
+```
+
+The generated feature dataset can be directly used in a separate machine-learning workflow.
 
 ---
 
-## Typical Research Workflow
-
-A researcher can use RadCNNFuse as a feature-engineering layer:
+## Research Workflow
 
 ```text
 Medical Images
-      │
-      ▼
+      ↓
    RadCNNFuse
-      │
-      ├── Radiomics
-      ├── CNN
-      ├── Fusion
-      ├── Scaling
-      └── PCA
-      │
-      ▼
-PCA Feature CSV
-      │
-      ▼
-Train / Test Split
-      │
-      ▼
+      ↓
+Radiomics + CNN
+      ↓
+Feature Fusion
+      ↓
+Scaling
+      ↓
+PCA
+      ↓
+Feature CSV
+      ↓
 Researcher's Classifier
-      │
-      ▼
+      ↓
 Evaluation
 ```
-
-This design allows the same extracted representation to be investigated using multiple downstream classifiers.
 
 ---
 
 ## Motivation
 
-RadCNNFuse originated from undergraduate thesis research involving medical CT images.
+RadCNNFuse originated from my undergraduate thesis research in medical-image analysis.
 
-During the research process, extracting handcrafted radiomics features required substantial time and repeated implementation. Combining those handcrafted representations with CNN features introduced additional preprocessing, feature management, scaling, fusion, and dimensionality-reduction steps.
+During the research process, I experienced firsthand how time-consuming it could be to repeatedly extract radiomics features, obtain CNN representations, combine them, perform dimensionality reduction, and prepare the resulting data for machine-learning experiments.
 
-The experience motivated the development of a reusable framework that could turn this multi-stage workflow into a simpler and more systematic process.
+This led to a simple idea:
 
-### The motivation in one sentence
+> **Why rebuild the same feature-engineering pipeline for every experiment when it can be packaged into a reusable framework?**
 
-> **Instead of repeatedly rebuilding the radiomics + CNN feature-engineering pipeline for every experiment, RadCNNFuse provides a reusable feature-engineering layer that produces a ready-to-use reduced feature representation.**
-
-The long-term objective is to make hybrid feature engineering more accessible for researchers working on medical-image analysis.
+RadCNNFuse is my attempt to turn that repetitive workflow into a reusable research tool.
 
 ---
-## ⚠️ Disclaimer
+
+---
+
+## Disclaimer
 
 RadCNNFuse is a **research and experimentation framework**.
 
-It is not a certified medical device and should not be used for:
+It is not a certified medical device and should not be used for clinical diagnosis or treatment decisions.
 
-* clinical diagnosis,
-* treatment decisions,
-* patient management,
-* or other clinical decision-making.
-
-The experimental results reported in this repository should not be interpreted as evidence of clinical effectiveness.
-
-Further external validation on independent and diverse datasets is required before any potential clinical application.
+Experimental results should not be interpreted as clinical diagnostic performance.
 
 ---
 
 ## Roadmap
 
-Future development may include:
-
-* [ ] Configurable radiomics feature classes
+* [ ] More radiomics configurations
 * [ ] Additional CNN backbones
-* [ ] Multiple preprocessing strategies
+* [ ] More preprocessing options
 * [ ] Additional dimensionality-reduction methods
 * [ ] Automated classifier benchmarking
-* [ ] Improved batch-processing utilities
-* [ ] Improved error handling
-* [ ] PyPI-ready packaging
-* [ ] Comprehensive API documentation
-* [ ] Unit tests
-* [ ] Integration tests
-* [ ] Reproducible experiment configurations
-* [ ] Support for additional medical-image formats
-* [ ] Optional GPU acceleration
+* [ ] Improved documentation
+* [ ] PyPI release
+* [ ] More medical-image format support
+* [ ] Unit and integration tests
 
 ---
 
-## Contributing
-
-Contributions, suggestions, bug reports, and research collaborations are welcome.
-
-If you find a problem or have a suggestion, please open a GitHub issue.
-
-Pull requests are also welcome.
-
-For major methodological changes, opening an issue before submitting a pull request is recommended.
-
 ---
 
-## 👩‍💻 Author
+## Developed by
 
 **Jerin Sultana**
-
 Department of Computer Science and Engineering
 University of Science and Technology Chittagong (USTC)
 
 ---
 
-## Acknowledgment
-
-RadCNNFuse was developed as part of undergraduate research in medical image analysis and was motivated by practical challenges encountered during radiomics-based feature extraction and hybrid deep-learning experimentation.
-
-The project represents an effort to transform a repetitive research workflow into a reusable feature-engineering framework.
-
-If you find RadCNNFuse useful for your research, consider giving the repository a ⭐ on GitHub.
-
----
-
 ## Project Status
 
-**Current status: Research Prototype / Experimental Release**
+**Research Prototype / Experimental Release**
 
-The current version has been experimentally validated for the kidney CT image classification workflow described in this repository.
+RadCNNFuse is currently intended for **research, experimentation, and medical-image feature engineering**.
 
-The framework is intended primarily for **research, experimentation, and feature-engineering studies**. Further testing, documentation, benchmarking, and external validation are planned for future releases.
+Further benchmarking, documentation, testing, and external validation are planned.
