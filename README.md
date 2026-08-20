@@ -14,26 +14,6 @@ During my undergraduate medical-image research, I found that extracting radiomic
 
 RadCNNFuse was developed to make this workflow **simpler, reusable, and faster to reproduce**.
 
-### The idea
-
-```text
-Medical Image
-      ↓
-   RadCNNFuse
-      ↓
-Radiomics + CNN Features
-      ↓
-     Fusion
-      ↓
-   Scaling + PCA
-      ↓
-PCA Feature Dataset
-      ↓
-Researcher's Classifier
-```
-
----
-
 ## Core Pipeline
 
 <p align="center">
