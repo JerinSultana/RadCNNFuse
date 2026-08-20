@@ -174,7 +174,7 @@ The reported processing time is specific to the tested hardware, preprocessing c
 Clone the repository:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/RadCNNFuse.git
+git clone https://github.com/JerinSultana/RadCNNFuse.git
 cd RadCNNFuse
 ```
 
