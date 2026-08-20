@@ -17,5 +17,3 @@ setup(
         "scikit-learn",
     ],
 )
-```
-
