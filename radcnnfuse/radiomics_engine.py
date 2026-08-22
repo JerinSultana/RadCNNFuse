@@ -28,6 +28,9 @@ RADIOMICS_SETTINGS = {
 }
 
 
+EXPECTED_RADIOMICS_FEATURES = 567
+
+
 def create_radiomics_extractor():
     """Create and configure the PyRadiomics extractor."""
 
@@ -69,7 +72,7 @@ def extract_radiomics_features(
     Returns
     -------
     radiomics_features : np.ndarray
-        Radiomics feature vector.
+        Radiomics feature vector with 567 features.
 
     mask_source : str
         'external' or 'automatic'.
@@ -89,6 +92,17 @@ def extract_radiomics_features(
         image_size
     )
 
+    if mask is None:
+        raise ValueError(
+            "ROI mask generation failed."
+        )
+
+    if np.count_nonzero(mask) == 0:
+        raise ValueError(
+            "No labels found in this mask "
+            "(i.e. nothing is segmented)!"
+        )
+
     sitk_image = sitk.GetImageFromArray(
         image.astype(np.float32)
     )
@@ -102,19 +116,20 @@ def extract_radiomics_features(
         sitk_mask
     )
 
-    feature_values = []
+    feature_dict = {}
 
     for key, value in result.items():
 
-        if str(key).startswith(
-            "diagnostics_"
-        ):
+        if str(key).startswith("diagnostics_"):
             continue
 
         try:
-            feature_values.append(
-                float(value)
-            )
+
+            numeric_value = float(value)
+
+            if np.isfinite(numeric_value):
+
+                feature_dict[str(key)] = numeric_value
 
         except (
             TypeError,
@@ -122,8 +137,16 @@ def extract_radiomics_features(
         ):
             continue
 
+    if len(feature_dict) != EXPECTED_RADIOMICS_FEATURES:
+
+        raise ValueError(
+            "Unexpected radiomics feature dimension: "
+            f"{len(feature_dict)}. "
+            f"Expected {EXPECTED_RADIOMICS_FEATURES}."
+        )
+
     radiomics_features = np.asarray(
-        feature_values,
+        list(feature_dict.values()),
         dtype=np.float64
     )
 
